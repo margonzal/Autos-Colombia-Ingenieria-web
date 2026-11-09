@@ -21,7 +21,6 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
     sistema: 'Autos Colombia - Sistema de Gestión de Parqueadero',
-    iteracion: 'Iteración 2',
     timestamp: new Date()
   });
 });

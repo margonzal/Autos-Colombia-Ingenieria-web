@@ -7,5 +7,6 @@ router.use(verifyToken);
 
 router.get('/', novedadController.getNovedades);
 router.post('/', novedadController.createNovedad);
+router.patch('/:id/estado', novedadController.updateEstadoNovedad);
 
 module.exports = router;

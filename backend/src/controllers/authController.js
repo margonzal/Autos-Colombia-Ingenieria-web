@@ -4,19 +4,20 @@ const jwt = require('jsonwebtoken');
 
 // Iniciar sesión
 const login = async (req, res) => {
-  const { correo, password } = req.body;
+  const { correo, email, password } = req.body;
+  const targetEmail = (correo || email || '').trim().toLowerCase();
 
-  if (!correo || !password) {
+  if (!targetEmail || !password) {
     return res.status(400).json({
       success: false,
-      message: 'Por favor ingrese correo y contraseña'
+      message: 'Por favor ingrese correo electrónico y contraseña'
     });
   }
 
   try {
     const [rows] = await pool.query(
-      'SELECT id, nombre_completo, correo, password, rol, estado FROM usuarios WHERE correo = ?',
-      [correo.trim().toLowerCase()]
+      'SELECT idUsuario, nombre, email, password, rol, estado FROM Usuario WHERE email = ?',
+      [targetEmail]
     );
 
     if (rows.length === 0) {
@@ -35,7 +36,7 @@ const login = async (req, res) => {
       });
     }
 
-    // Verificar contraseña exclusivamente mediante Bcrypt (sin alternativas en texto plano)
+    // Verificar contraseña con bcrypt
     const passwordValido = await bcrypt.compare(password, usuario.password);
 
     if (!passwordValido) {
@@ -57,9 +58,12 @@ const login = async (req, res) => {
     // Generar Token JWT (duración: 12 horas)
     const token = jwt.sign(
       {
-        id: usuario.id,
-        nombre_completo: usuario.nombre_completo,
-        correo: usuario.correo,
+        id: usuario.idUsuario,
+        idUsuario: usuario.idUsuario,
+        nombre: usuario.nombre,
+        nombre_completo: usuario.nombre,
+        email: usuario.email,
+        correo: usuario.email,
         rol: usuario.rol
       },
       jwtSecret,
@@ -71,9 +75,12 @@ const login = async (req, res) => {
       message: 'Inicio de sesión exitoso',
       token,
       usuario: {
-        id: usuario.id,
-        nombre_completo: usuario.nombre_completo,
-        correo: usuario.correo,
+        id: usuario.idUsuario,
+        idUsuario: usuario.idUsuario,
+        nombre: usuario.nombre,
+        nombre_completo: usuario.nombre,
+        email: usuario.email,
+        correo: usuario.email,
         rol: usuario.rol
       }
     });
@@ -87,12 +94,13 @@ const login = async (req, res) => {
   }
 };
 
-// Obtener información del usuario autenticado actual
+// Obtener perfil del usuario autenticado
 const getPerfil = async (req, res) => {
   try {
+    const userId = req.user.idUsuario || req.user.id;
     const [rows] = await pool.query(
-      'SELECT id, nombre_completo, correo, rol, estado, creado_en FROM usuarios WHERE id = ?',
-      [req.user.id]
+      'SELECT idUsuario, idUsuario AS id, nombre, nombre AS nombre_completo, email, email AS correo, rol, estado FROM Usuario WHERE idUsuario = ?',
+      [userId]
     );
 
     if (rows.length === 0) {

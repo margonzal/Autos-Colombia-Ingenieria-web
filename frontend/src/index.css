@@ -172,9 +172,14 @@ tr:hover td {
   text-transform: capitalize;
 }
 
-.badge-disponible, .badge-activo, .badge-cerrado {
+.badge-disponible, .badge-activo, .badge-cerrado, .badge-success {
   background-color: var(--success-bg);
   color: var(--success);
+}
+
+.badge-warning {
+  background-color: #fef3c7;
+  color: #d97706;
 }
 
 .badge-ocupada, .badge-abierto {

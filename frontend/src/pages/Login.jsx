@@ -34,7 +34,7 @@ export default function Login() {
         <div className="login-brand">
           <div className="login-logo">🚗</div>
           <h2 className="login-title">Autos Colombia</h2>
-          <p className="login-subtitle">Sistema Administrativo de Parqueadero (Iteración 2)</p>
+          <p className="login-subtitle">Sistema Administrativo del Parqueadero</p>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}

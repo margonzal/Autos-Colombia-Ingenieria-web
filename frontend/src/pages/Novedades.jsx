@@ -9,11 +9,12 @@ export default function Novedades() {
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
 
-  // Modal
+  // Modal de creación
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState({
     placa: '',
-    descripcion: ''
+    descripcion: '',
+    estado: 'Registrada'
   });
 
   const fetchNovedades = async () => {
@@ -35,7 +36,7 @@ export default function Novedades() {
   }, [busqueda]);
 
   const handleOpenCreate = () => {
-    setForm({ placa: '', descripcion: '' });
+    setForm({ placa: '', descripcion: '', estado: 'Registrada' });
     setError('');
     setIsModalOpen(true);
   };
@@ -50,6 +51,29 @@ export default function Novedades() {
       setTimeout(() => setMensaje(''), 4000);
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleCambiarEstado = async (id, nuevoEstado) => {
+    try {
+      await novedadService.updateEstado(id, nuevoEstado);
+      setMensaje(`Estado de la novedad #${id} actualizado a "${nuevoEstado}"`);
+      fetchNovedades();
+      setTimeout(() => setMensaje(''), 4000);
+    } catch (err) {
+      setError(err.message || 'Error al actualizar el estado de la novedad');
+      setTimeout(() => setError(''), 4000);
+    }
+  };
+
+  const getBadgeClass = (estado) => {
+    switch (estado) {
+      case 'Resuelta':
+        return 'badge-success';
+      case 'En Revisión':
+        return 'badge-warning';
+      default:
+        return 'badge-admin';
     }
   };
 
@@ -80,37 +104,54 @@ export default function Novedades() {
               <th>Placa</th>
               <th>Vehículo</th>
               <th>Descripción de la Novedad</th>
+              <th>Estado</th>
               <th>Registrado Por</th>
               <th>Fecha y Hora</th>
+              <th>Acción</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Cargando novedades...</td>
+                <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>Cargando novedades...</td>
               </tr>
             ) : novedades.length > 0 ? (
               novedades.map((n) => (
-                <tr key={n.id}>
-                  <td><strong>#{n.id}</strong></td>
+                <tr key={n.id || n.idNovedad}>
+                  <td><strong>#{n.id || n.idNovedad}</strong></td>
                   <td>
                     <span style={{ fontWeight: '800', color: '#1e40af' }}>{n.placa}</span>
                   </td>
                   <td>{n.marca} {n.modelo} ({n.color})</td>
-                  <td style={{ maxWidth: '350px', whiteSpace: 'pre-wrap' }}>
-                    {n.descripcion}
+                  <td style={{ maxWidth: '300px', whiteSpace: 'pre-wrap' }}>{n.descripcion}</td>
+                  <td>
+                    <span className={`badge ${getBadgeClass(n.estado)}`}>
+                      {n.estado || 'Registrada'}
+                    </span>
                   </td>
                   <td>
                     <div>{n.usuario_nombre}</div>
-                    <span className="badge badge-operador" style={{ fontSize: '0.65rem' }}>{n.usuario_rol}</span>
+                    <small style={{ color: '#64748b' }}>({n.usuario_rol})</small>
                   </td>
-                  <td>{new Date(n.fecha_hora).toLocaleString()}</td>
+                  <td>{n.fecha_hora ? new Date(n.fecha_hora).toLocaleString('es-CO') : '-'}</td>
+                  <td>
+                    <select
+                      className="form-control"
+                      style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', borderRadius: '4px' }}
+                      value={n.estado || 'Registrada'}
+                      onChange={(e) => handleCambiarEstado(n.id || n.idNovedad, e.target.value)}
+                    >
+                      <option value="Registrada">Registrada</option>
+                      <option value="En Revisión">En Revisión</option>
+                      <option value="Resuelta">Resuelta</option>
+                    </select>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
-                  No hay novedades registradas hasta el momento.
+                <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                  No se han registrado novedades en el sistema.
                 </td>
               </tr>
             )}
@@ -118,24 +159,14 @@ export default function Novedades() {
         </table>
       </div>
 
-      {/* Modal Nueva Novedad */}
+      {/* Modal para Registrar Novedad */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Registrar Nueva Novedad de Vehículo"
-        footer={
-          <>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
-              Cancelar
-            </button>
-            <button type="submit" form="form-novedad" className="btn btn-primary">
-              Guardar Novedad
-            </button>
-          </>
-        }
+        title="Registrar Nueva Novedad sobre Vehículo"
       >
-        {error && <div className="alert alert-error">{error}</div>}
-        <form id="form-novedad" onSubmit={handleSave}>
+        {error && <div className="alert alert-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+        <form onSubmit={handleSave}>
           <div className="form-group">
             <label className="form-label">Placa del Vehículo *</label>
             <input
@@ -143,20 +174,41 @@ export default function Novedades() {
               placeholder="Ej: ABC123"
               style={{ textTransform: 'uppercase', fontWeight: 'bold' }}
               value={form.placa}
-              onChange={(e) => setForm({ ...form, placa: e.target.value.toUpperCase() })}
+              onChange={(e) => setForm({ ...form, placa: e.target.value })}
               required
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Descripción Detallada de la Novedad *</label>
+            <label className="form-label">Descripción Detallada *</label>
             <textarea
               rows="4"
-              placeholder="Escriba los detalles de la novedad (golpe en puerta derecha, espejo fisurado, olvido de luces, etc.)..."
+              placeholder="Describa el incidente, golpe, rayón o detalle del vehículo..."
               value={form.descripcion}
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               required
             />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Estado Inicial</label>
+            <select
+              value={form.estado}
+              onChange={(e) => setForm({ ...form, estado: e.target.value })}
+            >
+              <option value="Registrada">Registrada</option>
+              <option value="En Revisión">En Revisión</option>
+              <option value="Resuelta">Resuelta</option>
+            </select>
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary">
+              Guardar Novedad
+            </button>
           </div>
         </form>
       </Modal>

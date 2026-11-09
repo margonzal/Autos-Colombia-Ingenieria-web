@@ -6,23 +6,30 @@ const getCeldas = async (req, res) => {
     const { estado, busqueda } = req.query;
 
     let sql = `
-      SELECT 
-        c.id,
-        c.codigo,
+      SELECT
+        c.idCelda AS id,
+        c.idCelda,
+        c.numeroCelda AS codigo,
+        c.numeroCelda,
         c.ubicacion,
         c.estado,
-        c.creado_en,
-        c.actualizado_en,
-        m.id AS movimiento_activo_id,
-        m.fecha_hora_entrada,
-        v.id AS vehiculo_id,
+        m.idMovimiento AS movimiento_activo_id,
+        m.idMovimiento,
+        m.fechaHoraEntrada AS fecha_hora_entrada,
+        m.fechaHoraEntrada,
+        v.idVehiculo AS vehiculo_id,
+        v.idVehiculo,
         v.placa AS vehiculo_placa,
+        v.placa,
         v.marca AS vehiculo_marca,
+        v.marca,
         v.modelo AS vehiculo_modelo,
-        v.color AS vehiculo_color
-      FROM celdas c
-      LEFT JOIN movimientos m ON c.id = m.celda_id AND m.estado = 'Abierto'
-      LEFT JOIN vehiculos v ON m.vehiculo_id = v.id
+        v.modelo,
+        v.color AS vehiculo_color,
+        v.color
+      FROM Celdas c
+      LEFT JOIN Movimiento m ON c.idCelda = m.Celdas_idCelda AND m.estado = 'Abierto'
+      LEFT JOIN Vehiculo v ON m.Vehiculo_idVehiculo = v.idVehiculo
       WHERE 1=1
     `;
     const params = [];
@@ -33,11 +40,11 @@ const getCeldas = async (req, res) => {
     }
 
     if (busqueda) {
-      sql += ' AND (c.codigo LIKE ? OR c.ubicacion LIKE ? OR v.placa LIKE ?)';
+      sql += ' AND (c.numeroCelda LIKE ? OR c.ubicacion LIKE ? OR v.placa LIKE ?)';
       params.push(`%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`);
     }
 
-    sql += ' ORDER BY c.codigo ASC';
+    sql += ' ORDER BY c.numeroCelda ASC';
 
     const [celdas] = await pool.query(sql, params);
 
@@ -55,7 +62,7 @@ const getCeldas = async (req, res) => {
 const getCeldasDisponibles = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, codigo, ubicacion, estado FROM celdas WHERE estado = "Disponible" ORDER BY codigo ASC'
+      'SELECT idCelda AS id, idCelda, numeroCelda AS codigo, numeroCelda, ubicacion, estado FROM Celdas WHERE estado = "Disponible" ORDER BY numeroCelda ASC'
     );
     return res.json({ success: true, data: rows });
   } catch (error) {
@@ -65,32 +72,32 @@ const getCeldasDisponibles = async (req, res) => {
 
 // Crear nueva celda
 const createCelda = async (req, res) => {
-  const { codigo, ubicacion, estado } = req.body;
+  const { numeroCelda, codigo, ubicacion, estado } = req.body;
+  const numCelda = (numeroCelda || codigo || '').trim().toUpperCase();
 
-  if (!codigo || !ubicacion) {
+  if (!numCelda || !ubicacion) {
     return res.status(400).json({
       success: false,
-      message: 'El código de celda y la ubicación son campos obligatorios'
+      message: 'El número de celda y la ubicación son campos obligatorios'
     });
   }
 
-  const codigoNormalizado = codigo.trim().toUpperCase();
   const ubicacionNormalizada = ubicacion.trim();
   const estadoFinal = estado && ['Disponible', 'Ocupada', 'Inactiva'].includes(estado) ? estado : 'Disponible';
 
   try {
-    // Validar código duplicado
-    const [existentes] = await pool.query('SELECT id FROM celdas WHERE UPPER(codigo) = ?', [codigoNormalizado]);
+    // Validar código/número duplicado
+    const [existentes] = await pool.query('SELECT idCelda FROM Celdas WHERE UPPER(numeroCelda) = ?', [numCelda]);
     if (existentes.length > 0) {
       return res.status(409).json({
         success: false,
-        message: `Ya existe una celda con el código ${codigoNormalizado}`
+        message: `Ya existe una celda con el número ${numCelda}`
       });
     }
 
     const [result] = await pool.query(
-      'INSERT INTO celdas (codigo, ubicacion, estado) VALUES (?, ?, ?)',
-      [codigoNormalizado, ubicacionNormalizada, estadoFinal]
+      'INSERT INTO Celdas (numeroCelda, ubicacion, estado) VALUES (?, ?, ?)',
+      [numCelda, ubicacionNormalizada, estadoFinal]
     );
 
     return res.status(201).json({
@@ -98,74 +105,80 @@ const createCelda = async (req, res) => {
       message: 'Celda registrada exitosamente',
       data: {
         id: result.insertId,
-        codigo: codigoNormalizado,
+        idCelda: result.insertId,
+        codigo: numCelda,
+        numeroCelda: numCelda,
         ubicacion: ubicacionNormalizada,
         estado: estadoFinal
       }
     });
   } catch (error) {
     console.error('Error al registrar celda:', error);
-    return res.status(500).json({ success: false, message: 'Error al registrar la celda', error: error.message });
+    return res.status(500).json({ success: false, message: 'Error interno al crear celda', error: error.message });
   }
 };
 
-// Editar celda
+// Actualizar celda existente
 const updateCelda = async (req, res) => {
   const { id } = req.params;
-  const { codigo, ubicacion, estado } = req.body;
+  const { numeroCelda, codigo, ubicacion, estado } = req.body;
+  const numCelda = numeroCelda || codigo;
 
   try {
-    const [existentes] = await pool.query('SELECT id, estado FROM celdas WHERE id = ?', [id]);
+    const [existentes] = await pool.query('SELECT idCelda, estado FROM Celdas WHERE idCelda = ?', [id]);
     if (existentes.length === 0) {
       return res.status(404).json({ success: false, message: 'Celda no encontrada' });
     }
 
-    const celdaActual = existentes[0];
-
-    // Si tiene movimiento activo y se intenta cambiar a disponible o inactiva manualmente
-    if (celdaActual.estado === 'Ocupada' && estado && estado !== 'Ocupada') {
-      const [movimientos] = await pool.query('SELECT id FROM movimientos WHERE celda_id = ? AND estado = "Abierto"', [id]);
-      if (movimientos.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'No puede cambiar el estado de una celda que tiene un vehículo ocupándola. Registre la salida del vehículo primero.'
-        });
+    if (numCelda) {
+      const numNormalizado = numCelda.trim().toUpperCase();
+      const [duplicados] = await pool.query(
+        'SELECT idCelda FROM Celdas WHERE UPPER(numeroCelda) = ? AND idCelda != ?',
+        [numNormalizado, id]
+      );
+      if (duplicados.length > 0) {
+        return res.status(409).json({ success: false, message: `El número de celda ${numNormalizado} ya existe` });
       }
     }
 
-    // Validar código duplicado con otra celda
-    if (codigo) {
-      const codigoNormalizado = codigo.trim().toUpperCase();
-      const [duplicados] = await pool.query(
-        'SELECT id FROM celdas WHERE UPPER(codigo) = ? AND id != ?',
-        [codigoNormalizado, id]
-      );
-      if (duplicados.length > 0) {
-        return res.status(409).json({ success: false, message: 'Ya existe otra celda con ese código' });
-      }
+    // No permitir cambiar a Inactiva o Disponible si actualmente está Ocupada
+    if (estado && estado !== existentes[0].estado && existentes[0].estado === 'Ocupada') {
+      return res.status(400).json({
+        success: false,
+        message: 'No puede alterar el estado de una celda actualmente ocupada. Debe registrar la salida del vehículo primero.'
+      });
     }
 
     await pool.query(
-      'UPDATE celdas SET codigo = COALESCE(?, codigo), ubicacion = COALESCE(?, ubicacion), estado = COALESCE(?, estado) WHERE id = ?',
-      [codigo ? codigo.trim().toUpperCase() : null, ubicacion ? ubicacion.trim() : null, estado || null, id]
+      `UPDATE Celdas SET
+        numeroCelda = COALESCE(?, numeroCelda),
+        ubicacion = COALESCE(?, ubicacion),
+        estado = COALESCE(?, estado)
+      WHERE idCelda = ?`,
+      [
+        numCelda ? numCelda.trim().toUpperCase() : null,
+        ubicacion ? ubicacion.trim() : null,
+        estado || null,
+        id
+      ]
     );
 
     return res.json({
       success: true,
-      message: 'Celda actualizada exitosamente'
+      message: 'Celda actualizada correctamente'
     });
   } catch (error) {
     console.error('Error al actualizar celda:', error);
-    return res.status(500).json({ success: false, message: 'Error al actualizar la celda', error: error.message });
+    return res.status(500).json({ success: false, message: 'Error interno al actualizar celda', error: error.message });
   }
 };
 
-// Activar o desactivar celda
+// Activar o desactivar celda (Disponible <-> Inactiva)
 const toggleEstadoCelda = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [rows] = await pool.query('SELECT id, codigo, estado FROM celdas WHERE id = ?', [id]);
+    const [rows] = await pool.query('SELECT idCelda, estado FROM Celdas WHERE idCelda = ?', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Celda no encontrada' });
     }
@@ -175,20 +188,21 @@ const toggleEstadoCelda = async (req, res) => {
     if (celda.estado === 'Ocupada') {
       return res.status(400).json({
         success: false,
-        message: 'No se puede desactivar una celda que actualmente está ocupada por un vehículo'
+        message: 'No es posible desactivar una celda que tiene un vehículo ocupándola.'
       });
     }
 
-    const nuevoEstado = celda.estado === 'Inactiva' ? 'Disponible' : 'Inactiva';
+    const nuevoEstado = celda.estado === 'Disponible' ? 'Inactiva' : 'Disponible';
 
-    await pool.query('UPDATE celdas SET estado = ? WHERE id = ?', [nuevoEstado, id]);
+    await pool.query('UPDATE Celdas SET estado = ? WHERE idCelda = ?', [nuevoEstado, id]);
 
     return res.json({
       success: true,
-      message: `Celda ${celda.codigo} ${nuevoEstado === 'Disponible' ? 'activada' : 'inactivada'} correctamente`,
+      message: `Celda marcada como ${nuevoEstado} exitosamente`,
       nuevoEstado
     });
   } catch (error) {
+    console.error('Error al cambiar estado de celda:', error);
     return res.status(500).json({ success: false, message: 'Error al cambiar estado de la celda', error: error.message });
   }
 };

@@ -5,47 +5,51 @@ const getDashboardData = async (req, res) => {
   try {
     // 1. Vehículos actualmente en parqueadero (movimientos abiertos)
     const [activosRows] = await pool.query(
-      'SELECT COUNT(*) AS total FROM movimientos WHERE estado = "Abierto"'
+      'SELECT COUNT(*) AS total FROM Movimiento WHERE estado = "Abierto"'
     );
 
     // 2. Entradas registradas durante el día
     const [entradasHoyRows] = await pool.query(
-      'SELECT COUNT(*) AS total FROM movimientos WHERE DATE(fecha_hora_entrada) = CURDATE()'
+      'SELECT COUNT(*) AS total FROM Movimiento WHERE DATE(fechaHoraEntrada) = CURDATE()'
     );
 
     // 3. Salidas registradas durante el día
     const [salidasHoyRows] = await pool.query(
-      'SELECT COUNT(*) AS total FROM movimientos WHERE DATE(fecha_hora_salida) = CURDATE() AND estado = "Cerrado"'
+      'SELECT COUNT(*) AS total FROM Movimiento WHERE DATE(fechaHoraSalida) = CURDATE() AND estado = "Cerrado"'
     );
 
     // 4. Conteo de celdas según estado
     const [celdasRows] = await pool.query(`
-      SELECT 
+      SELECT
         SUM(CASE WHEN estado = 'Disponible' THEN 1 ELSE 0 END) AS celdas_disponibles,
         SUM(CASE WHEN estado = 'Ocupada' THEN 1 ELSE 0 END) AS celdas_ocupadas,
         SUM(CASE WHEN estado = 'Inactiva' THEN 1 ELSE 0 END) AS celdas_inactivas,
         COUNT(*) AS total_celdas
-      FROM celdas
+      FROM Celdas
     `);
 
-    // 5. Total de vehículos registrados en el sistema
-    const [vehiculosRows] = await pool.query('SELECT COUNT(*) AS total FROM vehiculos WHERE estado = "Activo"');
+    // 5. Total de vehículos registrados activos en el sistema
+    const [vehiculosRows] = await pool.query('SELECT COUNT(*) AS total FROM Vehiculo WHERE estado = "Activo"');
 
-    // 6. Movimientos recientes (últimos 5)
+    // 6. Movimientos recientes (últimos 6)
     const [recientesRows] = await pool.query(`
-      SELECT 
-        m.id,
-        m.fecha_hora_entrada,
-        m.fecha_hora_salida,
+      SELECT
+        m.idMovimiento AS id,
+        m.idMovimiento,
+        m.fechaHoraEntrada AS fecha_hora_entrada,
+        m.fechaHoraEntrada,
+        m.fechaHoraSalida AS fecha_hora_salida,
+        m.fechaHoraSalida,
         m.estado,
         v.placa,
         v.marca,
         v.modelo,
-        c.codigo AS celda_codigo
-      FROM movimientos m
-      JOIN vehiculos v ON m.vehiculo_id = v.id
-      JOIN celdas c ON m.celda_id = c.id
-      ORDER BY m.id DESC
+        c.codigo AS celda_codigo,
+        c.codigo
+      FROM Movimiento m
+      JOIN Vehiculo v ON m.Vehiculo_idVehiculo = v.idVehiculo
+      JOIN Celdas c ON m.Celdas_idCelda = c.idCelda
+      ORDER BY m.idMovimiento DESC
       LIMIT 6
     `);
 

@@ -6,29 +6,36 @@ const getMovimientos = async (req, res) => {
     const { busqueda, estado, fecha_desde, fecha_hasta } = req.query;
 
     let sql = `
-      SELECT 
-        m.id,
-        m.fecha_hora_entrada,
-        m.fecha_hora_salida,
-        m.tiempo_permanencia_minutos,
+      SELECT
+        m.idMovimiento AS id,
+        m.idMovimiento,
+        m.fechaHoraEntrada AS fecha_hora_entrada,
+        m.fechaHoraEntrada,
+        m.fechaHoraSalida AS fecha_hora_salida,
+        m.fechaHoraSalida,
+        m.tiempoPermanenciaMinutos AS tiempo_permanencia_minutos,
+        m.tiempoPermanenciaMinutos,
         m.estado,
-        m.observaciones_entrada,
-        m.observaciones_salida,
-        v.id AS vehiculo_id,
+        m.observacionesEntrada AS observaciones_entrada,
+        m.observacionesSalida AS observaciones_salida,
+        v.idVehiculo AS vehiculo_id,
+        v.idVehiculo,
         v.placa,
         v.marca,
         v.modelo,
         v.color,
-        c.id AS celda_id,
-        c.codigo AS celda_codigo,
+        c.idCelda AS celda_id,
+        c.idCelda,
+        c.numeroCelda AS celda_codigo,
+        c.numeroCelda,
         c.ubicacion AS celda_ubicacion,
-        ue.nombre_completo AS usuario_entrada,
-        us.nombre_completo AS usuario_salida
-      FROM movimientos m
-      JOIN vehiculos v ON m.vehiculo_id = v.id
-      JOIN celdas c ON m.celda_id = c.id
-      JOIN usuarios ue ON m.usuario_entrada_id = ue.id
-      LEFT JOIN usuarios us ON m.usuario_salida_id = us.id
+        ue.nombre AS usuario_entrada,
+        us.nombre AS usuario_salida
+      FROM Movimiento m
+      JOIN Vehiculo v ON m.Vehiculo_idVehiculo = v.idVehiculo
+      JOIN Celdas c ON m.Celdas_idCelda = c.idCelda
+      JOIN Usuario ue ON m.idUsuarioEntrada = ue.idUsuario
+      LEFT JOIN Usuario us ON m.idUsuarioSalida = us.idUsuario
       WHERE 1=1
     `;
     const params = [];
@@ -39,21 +46,21 @@ const getMovimientos = async (req, res) => {
     }
 
     if (busqueda) {
-      sql += ' AND (v.placa LIKE ? OR c.codigo LIKE ? OR v.marca LIKE ?)';
+      sql += ' AND (v.placa LIKE ? OR c.numeroCelda LIKE ? OR v.marca LIKE ?)';
       params.push(`%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`);
     }
 
     if (fecha_desde) {
-      sql += ' AND DATE(m.fecha_hora_entrada) >= ?';
+      sql += ' AND DATE(m.fechaHoraEntrada) >= ?';
       params.push(fecha_desde);
     }
 
     if (fecha_hasta) {
-      sql += ' AND DATE(m.fecha_hora_entrada) <= ?';
+      sql += ' AND DATE(m.fechaHoraEntrada) <= ?';
       params.push(fecha_hasta);
     }
 
-    sql += ' ORDER BY m.id DESC';
+    sql += ' ORDER BY m.idMovimiento DESC';
 
     const [movimientos] = await pool.query(sql, params);
 
@@ -75,25 +82,30 @@ const getMovimientoActivoPorPlaca = async (req, res) => {
     const placaNormalizada = placa.trim().toUpperCase();
 
     const [rows] = await pool.query(
-      `SELECT 
-        m.id,
-        m.fecha_hora_entrada,
-        m.observaciones_entrada,
+      `SELECT
+        m.idMovimiento AS id,
+        m.idMovimiento,
+        m.fechaHoraEntrada AS fecha_hora_entrada,
+        m.fechaHoraEntrada,
+        m.observacionesEntrada AS observaciones_entrada,
         m.estado,
-        TIMESTAMPDIFF(MINUTE, m.fecha_hora_entrada, NOW()) AS minutos_transcurridos,
-        v.id AS vehiculo_id,
+        TIMESTAMPDIFF(MINUTE, m.fechaHoraEntrada, NOW()) AS minutos_transcurridos,
+        v.idVehiculo AS vehiculo_id,
+        v.idVehiculo,
         v.placa,
         v.marca,
         v.modelo,
         v.color,
-        c.id AS celda_id,
-        c.codigo AS celda_codigo,
+        c.idCelda AS celda_id,
+        c.idCelda,
+        c.numeroCelda AS celda_codigo,
+        c.numeroCelda,
         c.ubicacion AS celda_ubicacion,
-        u.nombre_completo AS usuario_entrada
-      FROM movimientos m
-      JOIN vehiculos v ON m.vehiculo_id = v.id
-      JOIN celdas c ON m.celda_id = c.id
-      JOIN usuarios u ON m.usuario_entrada_id = u.id
+        u.nombre AS usuario_entrada
+      FROM Movimiento m
+      JOIN Vehiculo v ON m.Vehiculo_idVehiculo = v.idVehiculo
+      JOIN Celdas c ON m.Celdas_idCelda = c.idCelda
+      JOIN Usuario u ON m.idUsuarioEntrada = u.idUsuario
       WHERE UPPER(v.placa) = ? AND m.estado = 'Abierto'
       LIMIT 1`,
       [placaNormalizada]
@@ -119,7 +131,7 @@ const getMovimientoActivoPorPlaca = async (req, res) => {
 // Registrar Entrada
 const registrarEntrada = async (req, res) => {
   const { placa, celda_id, observaciones_entrada } = req.body;
-  const usuario_entrada_id = req.user ? req.user.id : 1;
+  const usuario_entrada_id = req.user ? (req.user.idUsuario || req.user.id) : 1;
 
   if (!placa || !celda_id) {
     return res.status(400).json({
@@ -137,7 +149,7 @@ const registrarEntrada = async (req, res) => {
 
     // 1. Verificar si el vehículo existe y está activo
     const [vehiculos] = await connection.query(
-      'SELECT id, placa, marca, modelo, estado FROM vehiculos WHERE UPPER(placa) = ?',
+      'SELECT idVehiculo, placa, marca, modelo, estado FROM Vehiculo WHERE UPPER(placa) = ?',
       [placaNormalizada]
     );
 
@@ -161,8 +173,8 @@ const registrarEntrada = async (req, res) => {
 
     // 2. Validar que el vehículo NO tenga ya un movimiento abierto
     const [movimientosAbiertos] = await connection.query(
-      'SELECT id, celda_id FROM movimientos WHERE vehiculo_id = ? AND estado = "Abierto"',
-      [vehiculo.id]
+      'SELECT idMovimiento, Celdas_idCelda FROM Movimiento WHERE Vehiculo_idVehiculo = ? AND estado = "Abierto"',
+      [vehiculo.idVehiculo]
     );
 
     if (movimientosAbiertos.length > 0) {
@@ -175,7 +187,7 @@ const registrarEntrada = async (req, res) => {
 
     // 3. Validar que la celda exista y esté DISPONIBLE
     const [celdas] = await connection.query(
-      'SELECT id, codigo, estado FROM celdas WHERE id = ? FOR UPDATE',
+      'SELECT idCelda, numeroCelda, estado FROM Celdas WHERE idCelda = ? FOR UPDATE',
       [celda_id]
     );
 
@@ -190,7 +202,7 @@ const registrarEntrada = async (req, res) => {
       await connection.rollback();
       return res.status(400).json({
         success: false,
-        message: `La celda ${celda.codigo} ya se encuentra ocupada por otro vehículo.`
+        message: `La celda ${celda.numeroCelda} ya se encuentra ocupada por otro vehículo.`
       });
     }
 
@@ -198,31 +210,34 @@ const registrarEntrada = async (req, res) => {
       await connection.rollback();
       return res.status(400).json({
         success: false,
-        message: `La celda ${celda.codigo} está inactiva y no puede ser asignada.`
+        message: `La celda ${celda.numeroCelda} está inactiva y no puede ser asignada.`
       });
     }
 
     // 4. Crear el registro de movimiento
     const fechaHoraEntrada = new Date();
     const [insertResult] = await connection.query(
-      `INSERT INTO movimientos 
-        (vehiculo_id, celda_id, usuario_entrada_id, fecha_hora_entrada, estado, observaciones_entrada) 
+      `INSERT INTO Movimiento
+        (Vehiculo_idVehiculo, Celdas_idCelda, idUsuarioEntrada, fechaHoraEntrada, estado, observacionesEntrada)
        VALUES (?, ?, ?, ?, 'Abierto', ?)`,
-      [vehiculo.id, celda.id, usuario_entrada_id, fechaHoraEntrada, observaciones_entrada || null]
+      [vehiculo.idVehiculo, celda.idCelda, usuario_entrada_id, fechaHoraEntrada, observaciones_entrada || null]
     );
 
     // 5. Actualizar el estado de la celda a Ocupada
-    await connection.query('UPDATE celdas SET estado = "Ocupada" WHERE id = ?', [celda.id]);
+    await connection.query('UPDATE Celdas SET estado = "Ocupada" WHERE idCelda = ?', [celda.idCelda]);
 
     await connection.commit();
 
     return res.status(201).json({
       success: true,
-      message: `Entrada registrada con éxito para el vehículo ${placaNormalizada} en la celda ${celda.codigo}`,
+      message: `Entrada registrada con éxito para el vehículo ${placaNormalizada} en la celda ${celda.numeroCelda}`,
       data: {
         movimiento_id: insertResult.insertId,
+        idMovimiento: insertResult.insertId,
+        id: insertResult.insertId,
         vehiculo_placa: placaNormalizada,
-        celda_codigo: celda.codigo,
+        celda_codigo: celda.numeroCelda,
+        numeroCelda: celda.numeroCelda,
         fecha_hora_entrada: fechaHoraEntrada
       }
     });
@@ -242,7 +257,7 @@ const registrarEntrada = async (req, res) => {
 // Registrar Salida
 const registrarSalida = async (req, res) => {
   const { movimiento_id, observaciones_salida } = req.body;
-  const usuario_salida_id = req.user ? req.user.id : 1;
+  const usuario_salida_id = req.user ? (req.user.idUsuario || req.user.id) : 1;
 
   if (!movimiento_id) {
     return res.status(400).json({
@@ -258,11 +273,11 @@ const registrarSalida = async (req, res) => {
 
     // 1. Obtener el movimiento abierto
     const [movimientos] = await connection.query(
-      `SELECT m.*, v.placa, c.codigo AS celda_codigo 
-       FROM movimientos m
-       JOIN vehiculos v ON m.vehiculo_id = v.id
-       JOIN celdas c ON m.celda_id = c.id
-       WHERE m.id = ? FOR UPDATE`,
+      `SELECT m.*, v.placa, c.idCelda, c.numeroCelda
+       FROM Movimiento m
+       JOIN Vehiculo v ON m.Vehiculo_idVehiculo = v.idVehiculo
+       JOIN Celdas c ON m.Celdas_idCelda = c.idCelda
+       WHERE m.idMovimiento = ? FOR UPDATE`,
       [movimiento_id]
     );
 
@@ -283,24 +298,24 @@ const registrarSalida = async (req, res) => {
 
     // 2. Calcular tiempo de permanencia
     const fechaHoraSalida = new Date();
-    const fechaEntrada = new Date(mov.fecha_hora_entrada);
+    const fechaEntrada = new Date(mov.fechaHoraEntrada);
     const diffMs = fechaHoraSalida - fechaEntrada;
     const tiempoPermanenciaMinutos = Math.max(1, Math.round(diffMs / (1000 * 60)));
 
     // 3. Actualizar movimiento a Cerrado
     await connection.query(
-      `UPDATE movimientos SET 
-        usuario_salida_id = ?, 
-        fecha_hora_salida = ?, 
-        tiempo_permanencia_minutos = ?, 
-        estado = 'Cerrado', 
-        observaciones_salida = ?
-       WHERE id = ?`,
-      [usuario_salida_id, fechaHoraSalida, tiempoPermanenciaMinutos, observaciones_salida || null, mov.id]
+      `UPDATE Movimiento SET
+        idUsuarioSalida = ?,
+        fechaHoraSalida = ?,
+        tiempoPermanenciaMinutos = ?,
+        estado = 'Cerrado',
+        observacionesSalida = ?
+       WHERE idMovimiento = ?`,
+      [usuario_salida_id, fechaHoraSalida, tiempoPermanenciaMinutos, observaciones_salida || null, mov.idMovimiento]
     );
 
     // 4. Liberar la celda a Disponible
-    await connection.query('UPDATE celdas SET estado = "Disponible" WHERE id = ?', [mov.celda_id]);
+    await connection.query('UPDATE Celdas SET estado = "Disponible" WHERE idCelda = ?', [mov.Celdas_idCelda]);
 
     await connection.commit();
 
@@ -308,10 +323,14 @@ const registrarSalida = async (req, res) => {
       success: true,
       message: `Salida registrada exitosamente. Tiempo de permanencia: ${tiempoPermanenciaMinutos} minutos.`,
       data: {
-        movimiento_id: mov.id,
+        movimiento_id: mov.idMovimiento,
+        idMovimiento: mov.idMovimiento,
+        id: mov.idMovimiento,
         placa: mov.placa,
-        celda: mov.celda_codigo,
-        fecha_hora_entrada: mov.fecha_hora_entrada,
+        celda: mov.numeroCelda,
+        numeroCelda: mov.numeroCelda,
+        celda_codigo: mov.numeroCelda,
+        fecha_hora_entrada: mov.fechaHoraEntrada,
         fecha_hora_salida: fechaHoraSalida,
         tiempo_permanencia_minutos: tiempoPermanenciaMinutos
       }

@@ -6,22 +6,25 @@ const getVehiculos = async (req, res) => {
     const { busqueda, estado } = req.query;
 
     let sql = `
-      SELECT 
-        v.id,
+      SELECT
+        v.idVehiculo AS id,
+        v.idVehiculo,
         v.placa,
         v.marca,
         v.modelo,
         v.color,
-        v.tipo,
         v.estado,
-        v.creado_en,
-        m.id AS movimiento_activo_id,
-        m.fecha_hora_entrada,
-        c.codigo AS celda_codigo,
+        m.idMovimiento AS movimiento_activo_id,
+        m.idMovimiento,
+        m.fechaHoraEntrada AS fecha_hora_entrada,
+        m.fechaHoraEntrada,
+        c.idCelda AS celda_id,
+        c.numeroCelda AS celda_codigo,
+        c.numeroCelda,
         c.ubicacion AS celda_ubicacion
-      FROM vehiculos v
-      LEFT JOIN movimientos m ON v.id = m.vehiculo_id AND m.estado = 'Abierto'
-      LEFT JOIN celdas c ON m.celda_id = c.id
+      FROM Vehiculo v
+      LEFT JOIN Movimiento m ON v.idVehiculo = m.Vehiculo_idVehiculo AND m.estado = 'Abierto'
+      LEFT JOIN Celdas c ON m.Celdas_idCelda = c.idCelda
       WHERE 1=1
     `;
     const params = [];
@@ -36,7 +39,7 @@ const getVehiculos = async (req, res) => {
       params.push(`%${busqueda}%`, `%${busqueda}%`, `%${busqueda}%`);
     }
 
-    sql += ' ORDER BY v.id DESC';
+    sql += ' ORDER BY v.idVehiculo DESC';
 
     const [vehiculos] = await pool.query(sql, params);
 
@@ -58,22 +61,25 @@ const getVehiculoByPlaca = async (req, res) => {
     const placaNormalizada = placa.trim().toUpperCase();
 
     const [rows] = await pool.query(
-      `SELECT 
-        v.id,
+      `SELECT
+        v.idVehiculo AS id,
+        v.idVehiculo,
         v.placa,
         v.marca,
         v.modelo,
         v.color,
-        v.tipo,
         v.estado,
-        m.id AS movimiento_activo_id,
-        m.fecha_hora_entrada,
-        c.id AS celda_id,
-        c.codigo AS celda_codigo,
+        m.idMovimiento AS movimiento_activo_id,
+        m.idMovimiento,
+        m.fechaHoraEntrada AS fecha_hora_entrada,
+        m.fechaHoraEntrada,
+        c.idCelda AS celda_id,
+        c.numeroCelda AS celda_codigo,
+        c.numeroCelda,
         c.ubicacion AS celda_ubicacion
-      FROM vehiculos v
-      LEFT JOIN movimientos m ON v.id = m.vehiculo_id AND m.estado = 'Abierto'
-      LEFT JOIN celdas c ON m.celda_id = c.id
+      FROM Vehiculo v
+      LEFT JOIN Movimiento m ON v.idVehiculo = m.Vehiculo_idVehiculo AND m.estado = 'Abierto'
+      LEFT JOIN Celdas c ON m.Celdas_idCelda = c.idCelda
       WHERE UPPER(v.placa) = ?`,
       [placaNormalizada]
     );
@@ -97,12 +103,12 @@ const getVehiculoByPlaca = async (req, res) => {
 
 // Registrar nuevo vehículo
 const createVehiculo = async (req, res) => {
-  const { placa, marca, modelo, color, tipo, estado } = req.body;
+  const { placa, marca, modelo, color, estado } = req.body;
 
-  if (!placa || !marca || !modelo || !color) {
+  if (!placa || !marca || !color) {
     return res.status(400).json({
       success: false,
-      message: 'Placa, marca, modelo y color son campos obligatorios'
+      message: 'La placa, marca y color son campos obligatorios'
     });
   }
 
@@ -111,17 +117,17 @@ const createVehiculo = async (req, res) => {
 
   try {
     // Validar placa duplicada
-    const [existentes] = await pool.query('SELECT id FROM vehiculos WHERE UPPER(placa) = ?', [placaNormalizada]);
+    const [existentes] = await pool.query('SELECT idVehiculo FROM Vehiculo WHERE UPPER(placa) = ?', [placaNormalizada]);
     if (existentes.length > 0) {
       return res.status(409).json({
         success: false,
-        message: `El vehículo con placa ${placaNormalizada} ya se encuentra registrado`
+        message: `Ya existe un vehículo registrado con la placa ${placaNormalizada}`
       });
     }
 
     const [result] = await pool.query(
-      'INSERT INTO vehiculos (placa, marca, modelo, color, tipo, estado) VALUES (?, ?, ?, ?, ?, ?)',
-      [placaNormalizada, marca.trim(), modelo.trim(), color.trim(), tipo ? tipo.trim() : 'Automóvil', estadoFinal]
+      'INSERT INTO Vehiculo (placa, marca, modelo, color, estado) VALUES (?, ?, ?, ?, ?)',
+      [placaNormalizada, marca.trim(), modelo ? modelo.trim() : null, color.trim(), estadoFinal]
     );
 
     return res.status(201).json({
@@ -129,57 +135,60 @@ const createVehiculo = async (req, res) => {
       message: 'Vehículo registrado exitosamente',
       data: {
         id: result.insertId,
+        idVehiculo: result.insertId,
         placa: placaNormalizada,
         marca: marca.trim(),
-        modelo: modelo.trim(),
+        modelo: modelo ? modelo.trim() : null,
         color: color.trim(),
-        tipo: tipo || 'Automóvil',
         estado: estadoFinal
       }
     });
   } catch (error) {
     console.error('Error al registrar vehículo:', error);
-    return res.status(500).json({ success: false, message: 'Error al registrar vehículo', error: error.message });
+    return res.status(500).json({ success: false, message: 'Error interno al registrar vehículo', error: error.message });
   }
 };
 
-// Actualizar información de un vehículo
+// Actualizar información de vehículo
 const updateVehiculo = async (req, res) => {
   const { id } = req.params;
-  const { placa, marca, modelo, color, tipo, estado } = req.body;
+  const { placa, marca, modelo, color, estado } = req.body;
 
   try {
-    const [existentes] = await pool.query('SELECT id FROM vehiculos WHERE id = ?', [id]);
+    // Verificar existencia
+    const [existentes] = await pool.query('SELECT idVehiculo FROM Vehiculo WHERE idVehiculo = ?', [id]);
     if (existentes.length === 0) {
       return res.status(404).json({ success: false, message: 'Vehículo no encontrado' });
     }
 
+    // Si modifica placa, validar duplicidad
     if (placa) {
       const placaNormalizada = placa.trim().toUpperCase();
       const [duplicados] = await pool.query(
-        'SELECT id FROM vehiculos WHERE UPPER(placa) = ? AND id != ?',
+        'SELECT idVehiculo FROM Vehiculo WHERE UPPER(placa) = ? AND idVehiculo != ?',
         [placaNormalizada, id]
       );
       if (duplicados.length > 0) {
-        return res.status(409).json({ success: false, message: 'Ya existe otro vehículo registrado con esa placa' });
+        return res.status(409).json({
+          success: false,
+          message: `La placa ${placaNormalizada} ya se encuentra registrada en otro vehículo`
+        });
       }
     }
 
     await pool.query(
-      `UPDATE vehiculos SET 
+      `UPDATE Vehiculo SET
         placa = COALESCE(?, placa),
         marca = COALESCE(?, marca),
         modelo = COALESCE(?, modelo),
         color = COALESCE(?, color),
-        tipo = COALESCE(?, tipo),
         estado = COALESCE(?, estado)
-      WHERE id = ?`,
+      WHERE idVehiculo = ?`,
       [
         placa ? placa.trim().toUpperCase() : null,
         marca ? marca.trim() : null,
-        modelo ? modelo.trim() : null,
+        modelo !== undefined ? (modelo ? modelo.trim() : null) : null,
         color ? color.trim() : null,
-        tipo ? tipo.trim() : null,
         estado || null,
         id
       ]
@@ -191,7 +200,7 @@ const updateVehiculo = async (req, res) => {
     });
   } catch (error) {
     console.error('Error al actualizar vehículo:', error);
-    return res.status(500).json({ success: false, message: 'Error al actualizar vehículo', error: error.message });
+    return res.status(500).json({ success: false, message: 'Error interno al actualizar vehículo', error: error.message });
   }
 };
 

@@ -33,13 +33,13 @@ export default function App() {
       case 'vehiculos':
         return 'Gestión de Vehículos';
       case 'celdas':
-        return 'Gestión y Mapa de Celdas (Iteración 2)';
+        return 'Gestión y Mapa de Celdas ';
       case 'historial':
         return 'Historial de Movimientos';
       case 'novedades':
         return 'Registro y Consulta de Novedades';
       case 'usuarios':
-        return 'Gestión de Usuarios Internos (Iteración 2)';
+        return 'Gestión de Usuarios Internos ';
       default:
         return 'Autos Colombia';
     }

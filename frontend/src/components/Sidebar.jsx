@@ -9,10 +9,10 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'entradas', label: 'Registro de Entrada', icon: '📥', minRole: 'Operador' },
     { id: 'salidas', label: 'Registro de Salida', icon: '📤', minRole: 'Operador' },
     { id: 'vehiculos', label: 'Gestión de Vehículos', icon: '🚗', minRole: 'Operador' },
-    { id: 'celdas', label: 'Gestión de Celdas', icon: '🅿️', badge: 'Iteración 2', minRole: 'Operador' },
+    { id: 'celdas', label: 'Gestión de Celdas', icon: '🅿️', badge: '', minRole: 'Operador' },
     { id: 'historial', label: 'Historial', icon: '⏱️', minRole: 'Operador' },
     { id: 'novedades', label: 'Novedades', icon: '📝', minRole: 'Operador' },
-    { id: 'usuarios', label: 'Gestión de Usuarios', icon: '👥', badge: 'Iteración 2', minRole: 'Administrador' },
+    { id: 'usuarios', label: 'Gestión de Usuarios', icon: '👥', badge: '', minRole: 'Administrador' },
   ];
 
   return (

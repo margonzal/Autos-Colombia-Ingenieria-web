@@ -92,7 +92,8 @@ export const movimientoService = {
 // Servicios de Novedades
 export const novedadService = {
   getAll: (busqueda = '') => request(`/novedades?busqueda=${encodeURIComponent(busqueda)}`),
-  create: (data) => request('/novedades', { method: 'POST', body: JSON.stringify(data) })
+  create: (data) => request('/novedades', { method: 'POST', body: JSON.stringify(data) }),
+  updateEstado: (id, estado) => request(`/novedades/${id}/estado`, { method: 'PATCH', body: JSON.stringify({ estado }) })
 };
 
 // Servicios de Usuarios (Iteración 2)

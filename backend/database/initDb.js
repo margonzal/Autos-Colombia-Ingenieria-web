@@ -13,7 +13,7 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
  */
 async function initDatabase() {
   console.log('===========================================================');
-  console.log('🔄 Inicialización de Base de Datos - Autos Colombia (Iteración 2)');
+  console.log('🔄 Inicialización de Base de Datos - Autos Colombia');
   console.log('⚠️ AVISO: Asegúrese de no sobreescribir datos existentes.');
   console.log('===========================================================');
 

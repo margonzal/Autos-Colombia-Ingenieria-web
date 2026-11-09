@@ -1,6 +1,6 @@
 # Autos Colombia - Sistema Administrativo de Parqueadero (Iteración 2)
 
-Sistema web para la administración y control operativo del parqueadero **Autos Colombia**, desarrollado como proyecto académico para la asignatura **Ingeniería de Software** (Tecnología en Desarrollo de Software).
+Sistema web para la administración y control operativo del parqueadero **Autos Colombia**
 
 ---
 
@@ -79,92 +79,15 @@ Iteracion 2/
             └── api.js                 # Cliente HTTP con inyección automática de JWT
 ```
 
----
-
-## ⚠️ 3. ADVERTENCIA IMPORTANTE: Base de Datos Existente
-
-> [!WARNING]
-> Si ya cuenta con una base de datos o tablas creadas previamente en su servidor MySQL con información de la asignatura, **NO ejecute** `npm run init-db` ni ejecute directamente los archivos `schema.sql` o `seed.sql`.
->
-> Los archivos SQL provistos en `backend/database/` se crearon utilizando `CREATE TABLE IF NOT EXISTS` para no eliminar tablas previas, pero se recomienda **comparar manualmente** la estructura de sus tablas existentes con [`backend/database/schema.sql`](backend/database/schema.sql) antes de ejecutar cualquier script.
-
----
-
-## ⚙️ 4. Configuración de Variables de Entorno
-
-El backend requiere un archivo `.env` en la carpeta `backend/`. Se incluye el archivo de ejemplo `backend/.env.example` con la estructura necesaria:
-
-```env
-# Puerto del Servidor Backend
-PORT=5000
-
-# Conexión a Base de Datos MySQL
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=autos_colombia
-DB_PORT=3306
-
-# Clave Secreta para Firmar Tokens JWT
-JWT_SECRET=tu_clave_secreta_jwt_segura_aqui
-```
-
-> [!IMPORTANT]
-> Nunca incluya contraseñas de producción ni claves privadas en el control de versiones de Git. El archivo `.env` se encuentra explícitamente excluido en el `.gitignore`.
-
----
-
-## 📦 5. Instalación de Dependencias
-
-Abra una terminal en cada subproyecto para instalar los paquetes requeridos:
-
-### Backend:
-```bash
-cd backend
-npm install
-```
-
-### Frontend:
-```bash
-cd frontend
-npm install
-```
-
----
-
-## 🚀 6. Instrucciones para Iniciar el Proyecto
-
-### Paso 1: Iniciar el Backend (Node.js + Express)
-En una terminal ubicada en la carpeta `backend`:
-```bash
-npm run dev
-```
-- El servidor iniciará en: **`http://localhost:5000`**
-- Verificación del estado de la API: **`http://localhost:5000/api/health`**
-
-### Paso 2: Iniciar el Frontend (React + Vite)
-En una segunda terminal ubicada en la carpeta `frontend`:
-```bash
-npm run dev
-```
-- La aplicación se abrirá en el navegador en el puerto configurado: **`http://localhost:3000`**
-
----
-
-## 🔑 7. Credenciales de Prueba Verificadas
+## 🔑 3. Credenciales de Prueba Verificadas
 
 Para ingresar al sistema administrativo se han verificado los siguientes usuarios de prueba:
 
 | Rol | Correo Electrónico | Contraseña Verificada | Permisos del Rol |
 |---|---|---|---|
-| **Administrador** | `admin@autoscolombia.com` | `admin123` | Control total: Gestión de Usuarios, Gestión de Celdas y todas las operaciones |
-| **Operador** | `operador@autoscolombia.com` | `admin123` | Operación diaria: Entradas, Salidas, Vehículos, Historial y Novedades |
+| **Administrador** | `admin@autoscolombia.com` | `Itereishon2` | Control total: Gestión de Usuarios, Gestión de Celdas y todas las operaciones |
 
-*(En la pantalla de Login se incluyen botones de acceso rápido para cargar estas credenciales con un solo clic).*
-
----
-
-## 📋 8. Módulos Implementados
+## 📋 4. Módulos Implementados
 
 ### Módulos de Operación Diaria (Iteración 1)
 - **Inicio (Dashboard):** Tarjetas de métricas en tiempo real (vehículos dentro, entradas del día, salidas del día, celdas disponibles y celdas ocupadas) y tabla de movimientos recientes.

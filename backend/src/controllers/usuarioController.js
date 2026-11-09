@@ -5,7 +5,19 @@ const bcrypt = require('bcryptjs');
 const getUsuarios = async (req, res) => {
   try {
     const { rol, estado, busqueda } = req.query;
-    let sql = 'SELECT id, nombre_completo, correo, rol, estado, creado_en, actualizado_en FROM usuarios WHERE 1=1';
+    let sql = `
+      SELECT
+        idUsuario,
+        idUsuario AS id,
+        nombre,
+        nombre AS nombre_completo,
+        email,
+        email AS correo,
+        rol,
+        estado
+      FROM Usuario
+      WHERE 1=1
+    `;
     const params = [];
 
     if (rol) {
@@ -19,11 +31,11 @@ const getUsuarios = async (req, res) => {
     }
 
     if (busqueda) {
-      sql += ' AND (nombre_completo LIKE ? OR correo LIKE ?)';
+      sql += ' AND (nombre LIKE ? OR email LIKE ?)';
       params.push(`%${busqueda}%`, `%${busqueda}%`);
     }
 
-    sql += ' ORDER BY id DESC';
+    sql += ' ORDER BY idUsuario DESC';
 
     const [usuarios] = await pool.query(sql, params);
     return res.json({ success: true, data: usuarios });
@@ -38,7 +50,7 @@ const getUsuarioById = async (req, res) => {
   try {
     const { id } = req.params;
     const [rows] = await pool.query(
-      'SELECT id, nombre_completo, correo, rol, estado, creado_en FROM usuarios WHERE id = ?',
+      'SELECT idUsuario, idUsuario AS id, nombre, nombre AS nombre_completo, email, email AS correo, rol, estado FROM Usuario WHERE idUsuario = ?',
       [id]
     );
 
@@ -54,9 +66,11 @@ const getUsuarioById = async (req, res) => {
 
 // Crear nuevo usuario interno
 const createUsuario = async (req, res) => {
-  const { nombre_completo, correo, password, rol, estado } = req.body;
+  const { nombre, nombre_completo, email, correo, password, rol, estado } = req.body;
+  const targetNombre = (nombre || nombre_completo || '').trim();
+  const targetEmail = (email || correo || '').trim().toLowerCase();
 
-  if (!nombre_completo || !correo || !password || !rol) {
+  if (!targetNombre || !targetEmail || !password || !rol) {
     return res.status(400).json({
       success: false,
       message: 'Todos los campos obligatorios deben ser proporcionados (nombre, correo, contraseña, rol)'
@@ -69,7 +83,7 @@ const createUsuario = async (req, res) => {
 
   try {
     // Validar si el correo ya existe
-    const [existentes] = await pool.query('SELECT id FROM usuarios WHERE correo = ?', [correo.trim().toLowerCase()]);
+    const [existentes] = await pool.query('SELECT idUsuario FROM Usuario WHERE email = ?', [targetEmail]);
     if (existentes.length > 0) {
       return res.status(409).json({ success: false, message: 'Ya existe un usuario registrado con este correo electrónico' });
     }
@@ -81,8 +95,8 @@ const createUsuario = async (req, res) => {
     const estadoFinal = estado && ['Activo', 'Inactivo'].includes(estado) ? estado : 'Activo';
 
     const [result] = await pool.query(
-      'INSERT INTO usuarios (nombre_completo, correo, password, rol, estado) VALUES (?, ?, ?, ?, ?)',
-      [nombre_completo.trim(), correo.trim().toLowerCase(), passwordHash, rol, estadoFinal]
+      'INSERT INTO Usuario (nombre, email, password, rol, estado) VALUES (?, ?, ?, ?, ?)',
+      [targetNombre, targetEmail, passwordHash, rol, estadoFinal]
     );
 
     return res.status(201).json({
@@ -90,8 +104,11 @@ const createUsuario = async (req, res) => {
       message: 'Usuario registrado exitosamente',
       data: {
         id: result.insertId,
-        nombre_completo: nombre_completo.trim(),
-        correo: correo.trim().toLowerCase(),
+        idUsuario: result.insertId,
+        nombre: targetNombre,
+        nombre_completo: targetNombre,
+        email: targetEmail,
+        correo: targetEmail,
         rol,
         estado: estadoFinal
       }
@@ -105,30 +122,32 @@ const createUsuario = async (req, res) => {
 // Actualizar usuario
 const updateUsuario = async (req, res) => {
   const { id } = req.params;
-  const { nombre_completo, correo, password, rol, estado } = req.body;
+  const { nombre, nombre_completo, email, correo, password, rol, estado } = req.body;
+  const targetNombre = nombre || nombre_completo;
+  const targetEmail = email || correo;
 
   try {
     // Verificar existencia
-    const [existentes] = await pool.query('SELECT id FROM usuarios WHERE id = ?', [id]);
+    const [existentes] = await pool.query('SELECT idUsuario FROM Usuario WHERE idUsuario = ?', [id]);
     if (existentes.length === 0) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
     }
 
-    // Validar duplicado de correo con otro usuario
-    if (correo) {
+    // Validar duplicado de email con otro usuario
+    if (targetEmail) {
       const [duplicados] = await pool.query(
-        'SELECT id FROM usuarios WHERE correo = ? AND id != ?',
-        [correo.trim().toLowerCase(), id]
+        'SELECT idUsuario FROM Usuario WHERE email = ? AND idUsuario != ?',
+        [targetEmail.trim().toLowerCase(), id]
       );
       if (duplicados.length > 0) {
         return res.status(409).json({ success: false, message: 'El correo electrónico ya pertenece a otro usuario' });
       }
     }
 
-    let sql = 'UPDATE usuarios SET nombre_completo = COALESCE(?, nombre_completo), correo = COALESCE(?, correo), rol = COALESCE(?, rol), estado = COALESCE(?, estado)';
+    let sql = 'UPDATE Usuario SET nombre = COALESCE(?, nombre), email = COALESCE(?, email), rol = COALESCE(?, rol), estado = COALESCE(?, estado)';
     const params = [
-      nombre_completo ? nombre_completo.trim() : null,
-      correo ? correo.trim().toLowerCase() : null,
+      targetNombre ? targetNombre.trim() : null,
+      targetEmail ? targetEmail.trim().toLowerCase() : null,
       rol || null,
       estado || null
     ];
@@ -141,7 +160,7 @@ const updateUsuario = async (req, res) => {
       params.push(passwordHash);
     }
 
-    sql += ' WHERE id = ?';
+    sql += ' WHERE idUsuario = ?';
     params.push(id);
 
     await pool.query(sql, params);
@@ -161,19 +180,20 @@ const toggleEstadoUsuario = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [rows] = await pool.query('SELECT id, estado, rol FROM usuarios WHERE id = ?', [id]);
+    const [rows] = await pool.query('SELECT idUsuario, estado, rol FROM Usuario WHERE idUsuario = ?', [id]);
     if (rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
     }
 
+    const currentUserId = req.user ? (req.user.idUsuario || req.user.id) : null;
     // Evitar que el usuario actual se desactive a sí mismo si es el único admin
-    if (req.user && req.user.id === parseInt(id) && rows[0].estado === 'Activo') {
+    if (currentUserId && currentUserId === parseInt(id) && rows[0].estado === 'Activo') {
       return res.status(400).json({ success: false, message: 'No puedes desactivar tu propia cuenta activa' });
     }
 
     const nuevoEstado = rows[0].estado === 'Activo' ? 'Inactivo' : 'Activo';
 
-    await pool.query('UPDATE usuarios SET estado = ? WHERE id = ?', [nuevoEstado, id]);
+    await pool.query('UPDATE Usuario SET estado = ? WHERE idUsuario = ?', [nuevoEstado, id]);
 
     return res.json({
       success: true,
